@@ -304,8 +304,143 @@ const GlobalStyles = () => (
     /* ── Page transitions ── */
     .page { animation: fadeIn 0.25s ease; }
 
-    /* ── SOS pulse ── */
-    .sos-btn { animation: sos-pulse 2.5s ease-in-out infinite; }
+    /* ── Enhanced listening indicator ── */
+    .listening-indicator {
+      background: var(--teal-pale);
+      border: 1px solid var(--teal);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      margin: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      animation: fadeIn 0.3s ease;
+    }
+    .listening-indicator .transcript {
+      flex: 1;
+      font-size: 14px;
+      color: var(--teal);
+      font-weight: 500;
+    }
+    .listening-indicator .interim {
+      opacity: 0.7;
+      font-style: italic;
+    }
+    .listening-indicator .confidence {
+      font-size: 11px;
+      color: var(--warm-gray);
+      margin-top: 2px;
+    }
+
+    /* ── Error message styling ── */
+    .error-message {
+      background: var(--coral-pale);
+      border: 1px solid var(--coral);
+      color: var(--coral);
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      margin: 4px 0;
+    }
+
+    /* ── Speaking indicator ── */
+    .speaking-indicator {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 8px;
+      height: 8px;
+      background: var(--teal);
+      border-radius: 50%;
+      animation: pulse-ring 1.5s ease-in-out infinite;
+    }
+
+    /* ── Enhanced chat bubble with metadata ── */
+    .chat-bubble.enhanced {
+      position: relative;
+    }
+    .chat-bubble.enhanced .metadata {
+      position: absolute;
+      top: -20px;
+      right: 0;
+      font-size: 10px;
+      color: var(--warm-gray);
+      background: rgba(255, 255, 255, 0.9);
+      padding: 2px 6px;
+      border-radius: 8px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* ── Connection status ── */
+    .connection-status {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+    }
+    .connection-status.online { color: var(--teal); }
+    .connection-status.offline { color: var(--coral); }
+    .connection-status .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .connection-status.online .dot { background: var(--teal); }
+    .connection-status.offline .dot { background: var(--coral); }
+
+    /* ── Enhanced input with clear button ── */
+    .input-container {
+      position: relative;
+      flex: 1;
+    }
+    .input-container .clear-btn {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--warm-gray);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+    .input-container .clear-btn:hover {
+      background: var(--coral-pale);
+      color: var(--coral);
+    }
+
+    /* ── Processing indicator ── */
+    .processing-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--teal);
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .processing-indicator .dots {
+      display: flex;
+      gap: 2px;
+    }
+    .processing-indicator .dot {
+      width: 4px;
+      height: 4px;
+      background: var(--teal);
+      border-radius: 50%;
+      animation: wave 1.2s ease-in-out infinite;
+    }
+    .processing-indicator .dot:nth-child(1) { animation-delay: 0s; }
+    .processing-indicator .dot:nth-child(2) { animation-delay: 0.2s; }
+    .processing-indicator .dot:nth-child(3) { animation-delay: 0.4s; }
   `}</style>
 );
 
@@ -417,71 +552,233 @@ const Icon = {
 };
 
 /* ─────────────────────────────────────────
-   SPEECH UTILITIES
+   SPEECH UTILITIES - ENHANCED VERSION
 ───────────────────────────────────────── */
 const useSpeech = () => {
   const synth = window.speechSynthesis;
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voices, setVoices] = useState([]);
 
-  const speak = useCallback((text) => {
-    if (!synth) return;
+  useEffect(() => {
+    const loadVoices = () => {
+      const availableVoices = synth.getVoices();
+      setVoices(availableVoices);
+    };
+
+    loadVoices();
+    if (synth.onvoiceschanged !== undefined) {
+      synth.onvoiceschanged = loadVoices;
+    }
+  }, []);
+
+  const speak = useCallback((text, options = {}) => {
+    if (!synth || !text) return;
+
+    // Stop any current speech
     synth.cancel();
+    setIsSpeaking(false);
+
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.88;
-    utterance.pitch = 1.0;
-    utterance.volume = 1;
-    const voices = synth.getVoices();
-    const preferred = voices.find(v => v.lang === "en-US" && v.name.includes("Female"))
-      || voices.find(v => v.lang.startsWith("en"))
-      || voices[0];
-    if (preferred) utterance.voice = preferred;
+
+    // Enhanced voice selection
+    const preferredVoice = voices.find(v =>
+      v.lang.startsWith('en') &&
+      (v.name.includes('Female') || v.name.includes('Samantha') || v.name.includes('Zira'))
+    ) || voices.find(v => v.lang.startsWith('en')) || voices[0];
+
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
+    }
+
+    // Configurable speech settings
+    utterance.rate = options.rate || 0.85; // Slightly slower for clarity
+    utterance.pitch = options.pitch || 1.0;
+    utterance.volume = options.volume || 0.9; // Slightly quieter to be less startling
+
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+
     synth.speak(utterance);
-  }, [synth]);
+  }, [synth, voices]);
 
   const stopSpeaking = useCallback(() => {
-    if (synth) synth.cancel();
+    if (synth) {
+      synth.cancel();
+      setIsSpeaking(false);
+    }
   }, [synth]);
 
-  return { speak, stopSpeaking };
+  const pauseSpeaking = useCallback(() => {
+    if (synth && isSpeaking) {
+      synth.pause();
+    }
+  }, [synth, isSpeaking]);
+
+  const resumeSpeaking = useCallback(() => {
+    if (synth && synth.paused) {
+      synth.resume();
+    }
+  }, [synth]);
+
+  return {
+    speak,
+    stopSpeaking,
+    pauseSpeaking,
+    resumeSpeaking,
+    isSpeaking,
+    voices
+  };
 };
 
 const useSpeechRecognition = () => {
   const [transcript, setTranscript] = useState("");
+  const [interimTranscript, setInterimTranscript] = useState("");
   const [listening, setListening] = useState(false);
   const [supported, setSupported] = useState(false);
+  const [error, setError] = useState(null);
+  const [confidence, setConfidence] = useState(0);
+  const [isProcessing, setIsProcessing] = useState(false);
+
   const recogRef = useRef(null);
+  const timeoutRef = useRef(null);
 
   useEffect(() => {
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+
     if (SpeechRec) {
       setSupported(true);
-      const rec = new SpeechRec();
-      rec.continuous = false;
-      rec.interimResults = true;
-      rec.lang = "en-US";
-      rec.onresult = (e) => {
-        const t = Array.from(e.results).map(r => r[0].transcript).join("");
-        setTranscript(t);
+      const recognition = new SpeechRec();
+
+      // Enhanced recognition settings
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+      recognition.maxAlternatives = 1;
+
+      // Auto-stop after silence
+      recognition.onstart = () => {
+        setListening(true);
+        setError(null);
+        setIsProcessing(false);
+
+        // Auto-stop after 5 seconds of silence
+        timeoutRef.current = setTimeout(() => {
+          if (recognition && listening) {
+            recognition.stop();
+          }
+        }, 5000);
       };
-      rec.onend = () => setListening(false);
-      rec.onerror = () => setListening(false);
-      recogRef.current = rec;
+
+      recognition.onresult = (event) => {
+        let finalTranscript = '';
+        let interimTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+            setConfidence(event.results[i][0].confidence);
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+
+        if (finalTranscript) {
+          setTranscript(finalTranscript);
+          setInterimTranscript('');
+          setIsProcessing(true);
+        } else {
+          setInterimTranscript(interimTranscript);
+        }
+      };
+
+      recognition.onend = () => {
+        setListening(false);
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+        setIsProcessing(false);
+      };
+
+      recognition.onerror = (event) => {
+        setListening(false);
+        setError(event.error);
+        setIsProcessing(false);
+
+        // Handle specific errors
+        switch (event.error) {
+          case 'network':
+            setError('Network error - check your connection');
+            break;
+          case 'not-allowed':
+            setError('Microphone access denied');
+            break;
+          case 'no-speech':
+            setError('No speech detected');
+            break;
+          case 'aborted':
+            setError(null); // User cancelled, not an error
+            break;
+          default:
+            setError('Speech recognition error: ' + event.error);
+        }
+      };
+
+      recogRef.current = recognition;
     }
-  }, []);
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [listening]);
 
   const startListening = useCallback(() => {
     if (!recogRef.current) return;
-    setTranscript("");
-    setListening(true);
-    recogRef.current.start();
+
+    try {
+      setTranscript("");
+      setInterimTranscript("");
+      setError(null);
+      setConfidence(0);
+      recogRef.current.start();
+    } catch (err) {
+      setError('Failed to start speech recognition');
+    }
   }, []);
 
   const stopListening = useCallback(() => {
     if (!recogRef.current) return;
-    recogRef.current.stop();
-    setListening(false);
+
+    try {
+      recogRef.current.stop();
+    } catch (err) {
+      // Ignore errors when stopping
+    }
   }, []);
 
-  return { transcript, listening, supported, startListening, stopListening, setTranscript };
+  const resetTranscript = useCallback(() => {
+    setTranscript("");
+    setInterimTranscript("");
+    setError(null);
+    setConfidence(0);
+  }, []);
+
+  return {
+    transcript,
+    interimTranscript,
+    listening,
+    supported,
+    error,
+    confidence,
+    isProcessing,
+    startListening,
+    stopListening,
+    resetTranscript,
+    fullTranscript: transcript + interimTranscript
+  };
 };
 
 /* ─────────────────────────────────────────
@@ -513,7 +810,7 @@ const getAIResponse = (input, memories) => {
   if (lower.match(/help|what can you|how do/)) return rand(AI_RESPONSES.help);
   if (memories.length > 0) {
     const m = memories[Math.floor(Math.random() * memories.length)];
-    return `Here's a memory your caregiver saved: "${m.text}" — shared by ${m.person}. Would you like to hear more?`;
+    return "Here's a memory your caregiver saved: \"" + m.text + "\" - shared by " + m.person + ". Would you like to hear more?";
   }
   return rand(AI_RESPONSES.default);
 };
@@ -614,7 +911,7 @@ const MicButton = ({ listening, onToggle }) => (
 );
 
 /* ─────────────────────────────────────────
-   PAGE 1: HOME / VOICE ASSISTANT
+   PAGE 1: HOME / VOICE ASSISTANT - ENHANCED
 ───────────────────────────────────────── */
 const HomePage = ({ memories }) => {
   const [messages, setMessages] = useState([
@@ -623,45 +920,143 @@ const HomePage = ({ memories }) => {
   const [textInput, setTextInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
   const [sosActive, setSosActive] = useState(false);
+  const [backendError, setBackendError] = useState(null);
   const chatEndRef = useRef(null);
-  const { speak } = useSpeech();
-  const { transcript, listening, supported, startListening, stopListening, setTranscript } = useSpeechRecognition();
+
+  // Enhanced speech hooks
+  const { speak, stopSpeaking, isSpeaking } = useSpeech();
+  const {
+    transcript,
+    interimTranscript,
+    listening,
+    supported,
+    error: speechError,
+    confidence,
+    isProcessing,
+    startListening,
+    stopListening,
+    resetTranscript,
+    fullTranscript
+  } = useSpeechRecognition();
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isThinking]);
 
-  const sendMessage = useCallback((text) => {
+  // Auto-send message when speech recognition completes
+  useEffect(() => {
+    if (transcript && !listening && !isProcessing) {
+      sendMessage(transcript);
+    }
+  }, [transcript, listening, isProcessing]);
+
+  // Handle speech recognition errors
+  useEffect(() => {
+    if (speechError) {
+      const errorMsg = {
+        id: Date.now(),
+        sender: "ai",
+        text: `I didn't catch that clearly. Could you try speaking again or type your message? (${speechError})`,
+        time: new Date(),
+        type: "error"
+      };
+      setMessages(prev => [...prev, errorMsg]);
+      speak("I didn't catch that clearly. Could you try speaking again or type your message?");
+    }
+  }, [speechError, speak]);
+
+  const sendMessage = useCallback(async (text) => {
     if (!text.trim()) return;
-    const userMsg = { id: Date.now(), sender: "user", text: text.trim(), time: new Date() };
+
+    const userMsg = {
+      id: Date.now(),
+      sender: "user",
+      text: text.trim(),
+      time: new Date(),
+      confidence: confidence > 0 ? Math.round(confidence * 100) : null
+    };
+
     setMessages(prev => [...prev, userMsg]);
     setTextInput("");
-    setTranscript("");
+    resetTranscript();
     setIsThinking(true);
-    setTimeout(() => {
-      const aiText = getAIResponse(text, memories);
-      const aiMsg = { id: Date.now() + 1, sender: "ai", text: aiText, time: new Date() };
+    setBackendError(null);
+
+    try {
+      // Import the API function dynamically to avoid circular dependencies
+      const { askAI } = await import('./api');
+
+      // Prepare context from memories
+      let context = "";
+      if (memories.length > 0) {
+        const recentMemories = memories.slice(0, 3).map(m =>
+          `- ${m.person}: "${m.text}"`
+        ).join("\n");
+        context = `Recent memories:\n${recentMemories}`;
+      }
+
+      const response = await askAI(text.trim(), context);
+
+      const aiMsg = {
+        id: Date.now() + 1,
+        sender: "ai",
+        text: response.reply,
+        time: new Date(),
+        latency: response.latency_ms,
+        model: response.model
+      };
+
       setMessages(prev => [...prev, aiMsg]);
+      speak(response.reply);
+
+    } catch (error) {
+      console.error('Backend error:', error);
+      setBackendError(error.message);
+
+      const errorMsg = {
+        id: Date.now() + 1,
+        sender: "ai",
+        text: "I'm having trouble connecting right now. Please check if the backend server is running on port 5000.",
+        time: new Date(),
+        type: "error"
+      };
+
+      setMessages(prev => [...prev, errorMsg]);
+      speak("I'm having trouble connecting right now. Please check if the backend server is running.");
+    } finally {
       setIsThinking(false);
-      speak(aiText);
-    }, 900 + Math.random() * 600);
-  }, [memories, speak, setTranscript]);
+    }
+  }, [memories, confidence, speak, resetTranscript]);
 
   const handleMicToggle = () => {
     if (listening) {
       stopListening();
-      if (transcript.trim()) sendMessage(transcript);
     } else {
+      // Stop any current speech before starting listening
+      stopSpeaking();
       startListening();
     }
   };
 
   const handleSOS = () => {
     setSosActive(true);
-    speak("Emergency alert sent! Your caregiver has been notified immediately. Help is on the way. Stay calm.");
-    const sosMsg = { id: Date.now(), sender: "ai", text: "🚨 Emergency SOS activated! Your caregiver Sarah has been notified. Please stay calm — help is on the way. Calling emergency contact now.", time: new Date() };
+    speak("Emergency alert sent! Your caregiver has been notified immediately. Help is on the way. Stay calm.", { rate: 0.9, volume: 1.0 });
+    const sosMsg = {
+      id: Date.now(),
+      sender: "ai",
+      text: "🚨 Emergency SOS activated! Your caregiver Sarah has been notified. Please stay calm — help is on the way. Calling emergency contact now.",
+      time: new Date(),
+      type: "emergency"
+    };
     setMessages(prev => [...prev, sosMsg]);
     setTimeout(() => setSosActive(false), 5000);
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage(textInput);
+    }
   };
 
   return (
@@ -673,16 +1068,36 @@ const HomePage = ({ memories }) => {
             <h1 style={{ fontFamily: "var(--font-display)", fontSize: "20px", fontWeight: "600", color: "var(--charcoal)" }}>
               MemoVoice <span style={{ color: "var(--teal)" }}>AI</span>
             </h1>
-            <p style={{ fontSize: "12px", color: "var(--warm-gray)", marginTop: "1px" }}>Your caring companion</p>
+            <p style={{ fontSize: "12px", color: "var(--warm-gray)", marginTop: "1px" }}>
+              Your caring companion
+              {backendError && <span style={{ color: "var(--coral)", marginLeft: "8px" }}>⚠️ Connection issue</span>}
+            </p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <div className="badge badge-teal" style={{ fontSize: "11px" }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--teal)", display: "inline-block" }} />
-              Active
+            <div className={`badge ${backendError ? 'badge-coral' : 'badge-teal'}`} style={{ fontSize: "11px" }}>
+              <span style={{
+                width: 6, height: 6, borderRadius: "50%",
+                background: backendError ? "var(--coral)" : "var(--teal)",
+                display: "inline-block"
+              }} />
+              {backendError ? 'Offline' : 'Active'}
             </div>
+            {isSpeaking && (
+              <div className="badge badge-amber" style={{ fontSize: "11px" }}>
+                <Icon.Volume size={10} />
+                Speaking
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Error Banner */}
+      {backendError && (
+        <div style={{ margin: "0 16px 8px", padding: "10px 16px", background: "var(--coral-pale)", borderRadius: "var(--radius-sm)", border: "1px solid var(--coral)", color: "var(--coral)", fontSize: "13px", fontWeight: "500", textAlign: "center" }}>
+          ⚠️ Backend connection failed. Make sure the server is running on port 5000.
+        </div>
+      )}
 
       {/* SOS Banner */}
       {sosActive && (
@@ -693,26 +1108,57 @@ const HomePage = ({ memories }) => {
 
       {/* Chat Area */}
       <div className="chat-scroll">
-        {messages.map(msg => <ChatBubble key={msg.id} message={msg} />)}
+        {messages.map(msg => (
+          <div key={msg.id} style={{ position: "relative" }}>
+            <ChatBubble message={msg} />
+            {msg.confidence && msg.confidence < 80 && (
+              <div style={{
+                position: "absolute", top: "-8px", right: "16px",
+                background: "var(--amber-pale)", color: "var(--amber)",
+                padding: "2px 6px", borderRadius: "8px", fontSize: "10px",
+                fontWeight: "500"
+              }}>
+                {msg.confidence}% confidence
+              </div>
+            )}
+          </div>
+        ))}
+
         {isThinking && (
           <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 14px", background: "#fff", borderRadius: "var(--radius-md)", borderBottomLeftRadius: "4px", width: "fit-content", boxShadow: "var(--shadow-sm)" }}>
             {[0, 1, 2].map(i => (
               <div key={i} style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--teal)", opacity: 0.7, animation: `wave 0.9s ease-in-out ${i * 0.15}s infinite` }} />
             ))}
+            <span style={{ fontSize: "12px", color: "var(--warm-gray)", marginLeft: "4px" }}>Thinking...</span>
           </div>
         )}
         <div ref={chatEndRef} />
       </div>
 
-      {/* Listening indicator */}
+      {/* Enhanced Listening indicator */}
       {listening && (
-        <div style={{ padding: "8px 20px", display: "flex", alignItems: "center", gap: "12px", flexShrink: 0 }}>
+        <div style={{ padding: "8px 20px", display: "flex", alignItems: "center", gap: "12px", flexShrink: 0, background: "var(--teal-pale)", borderTop: "1px solid var(--teal)" }}>
           <div className="listening-waves">
             {[1,2,3,4,5].map(i => <span key={i} />)}
           </div>
-          <span style={{ fontSize: "13px", color: "var(--teal)", fontWeight: "500" }}>
-            {transcript || "Listening…"}
-          </span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: "13px", color: "var(--teal)", fontWeight: "500", marginBottom: "2px" }}>
+              {fullTranscript || "Listening..."}
+            </div>
+            <div style={{ fontSize: "11px", color: "var(--warm-gray)" }}>
+              {isProcessing ? "Processing..." : "Speak clearly - I'll auto-send when you finish"}
+            </div>
+          </div>
+          <button
+            onClick={stopListening}
+            style={{
+              padding: "6px 12px", background: "var(--coral)", color: "#fff",
+              border: "none", borderRadius: "var(--radius-sm)", fontSize: "12px",
+              cursor: "pointer", fontWeight: "500"
+            }}
+          >
+            Stop
+          </button>
         </div>
       )}
 
@@ -722,39 +1168,72 @@ const HomePage = ({ memories }) => {
           <MicButton listening={listening} onToggle={handleMicToggle} />
           <div style={{ flex: 1 }}>
             <p style={{ fontSize: "13px", fontWeight: "600", color: "var(--charcoal)", marginBottom: "2px" }}>
-              {listening ? "Tap to send" : "Tap to speak"}
+              {listening ? "Listening... tap to stop" : "Tap to speak"}
             </p>
             <p style={{ fontSize: "11px", color: "var(--warm-gray)" }}>
-              {supported ? "Voice recognition ready" : "Type your message below"}
+              {supported
+                ? (speechError ? `Error: ${speechError}` : "Voice recognition ready - auto-send when finished")
+                : "Voice not supported - type your message below"
+              }
             </p>
           </div>
           <SOSButton onPress={handleSOS} />
         </div>
 
-        {/* Text input row */}
+        {/* Enhanced Text input row */}
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          <input
-            className="form-input"
-            style={{ flex: 1, padding: "11px 14px", fontSize: "14px" }}
-            placeholder="Or type a message…"
-            value={textInput}
-            onChange={e => setTextInput(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && sendMessage(textInput)}
-          />
+          <div style={{ flex: 1, position: "relative" }}>
+            <input
+              className="form-input"
+              style={{ flex: 1, padding: "11px 14px", fontSize: "14px", paddingRight: "40px" }}
+              placeholder={listening ? "Listening..." : "Type your message… (Enter to send)"}
+              value={textInput}
+              onChange={e => setTextInput(e.target.value)}
+              onKeyDown={handleKeyPress}
+              disabled={listening}
+            />
+            {textInput && (
+              <button
+                onClick={() => setTextInput("")}
+                style={{
+                  position: "absolute", right: "8px", top: "50%",
+                  transform: "translateY(-50%)", background: "none",
+                  border: "none", color: "var(--warm-gray)", cursor: "pointer",
+                  padding: "4px", borderRadius: "50%"
+                }}
+                title="Clear text"
+              >
+                ×
+              </button>
+            )}
+          </div>
           <button
             onClick={() => sendMessage(textInput)}
-            disabled={!textInput.trim()}
+            disabled={!textInput.trim() || isThinking}
             style={{
               width: 42, height: 42, borderRadius: "var(--radius-sm)",
-              background: textInput.trim() ? "var(--teal)" : "var(--cream-dark)",
-              color: textInput.trim() ? "#fff" : "var(--warm-gray)",
-              border: "none", cursor: textInput.trim() ? "pointer" : "default",
+              background: (textInput.trim() && !isThinking) ? "var(--teal)" : "var(--cream-dark)",
+              color: (textInput.trim() && !isThinking) ? "#fff" : "var(--warm-gray)",
+              border: "none", cursor: (textInput.trim() && !isThinking) ? "pointer" : "default",
               display: "flex", alignItems: "center", justifyContent: "center",
               transition: "all 0.2s", flexShrink: 0,
             }}
+            title="Send message (Enter)"
           >
-            <Icon.Send size={16} />
+            {isThinking ? <div className="spinner" style={{ width: 16, height: 16 }} /> : <Icon.Send size={16} />}
           </button>
+        </div>
+
+        {/* Status indicators */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
+          <div style={{ fontSize: "11px", color: "var(--warm-gray)" }}>
+            {messages.length} messages • {memories.length} memories stored
+          </div>
+          {backendError && (
+            <div style={{ fontSize: "11px", color: "var(--coral)" }}>
+              Backend offline
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -969,6 +1448,8 @@ const AlertsPanel = ({ medications }) => {
     { id: 2, time: "9:30 AM", date: "Yesterday", status: "resolved", note: "Missed medication reminder — resolved by phone call" },
   ]);
   const [notifSent, setNotifSent] = useState(false);
+  const [medAlertSent, setMedAlertSent] = useState(false);
+  const { speak } = useSpeech();
 
   const CAREGIVERS = [
     { name: "Sarah Mitchell", relation: "Daughter", phone: "+1 (555) 234-5678", initials: "SM", color: "var(--teal-pale)", textColor: "var(--teal)" },
@@ -984,6 +1465,29 @@ const AlertsPanel = ({ medications }) => {
   const upcomingMeds = medications.filter(m => m.time);
   const now = new Date();
   const currentHour = now.getHours();
+
+  const announceMedications = () => {
+    if (upcomingMeds.length === 0) {
+      speak("There are no medication reminders scheduled right now.");
+      setMedAlertSent(true);
+      setTimeout(() => setMedAlertSent(false), 3000);
+      return;
+    }
+
+    const reminderText = upcomingMeds
+      .map((med) => {
+        const details = [];
+        if (med.name) details.push(med.name);
+        if (med.dosage) details.push(med.dosage);
+        if (med.time) details.push(`at ${med.time}`);
+        return details.join(' ');
+      })
+      .join('. ');
+
+    speak(`Medication reminder. Please take your medicine: ${reminderText}.`);
+    setMedAlertSent(true);
+    setTimeout(() => setMedAlertSent(false), 3000);
+  };
 
   return (
     <div className="page" style={{ overflow: "auto", height: "100%" }}>
@@ -1021,7 +1525,21 @@ const AlertsPanel = ({ medications }) => {
 
         {/* Medication Reminders */}
         <div>
-          <p className="section-label">Today's Medications</p>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginBottom: "10px" }}>
+            <p className="section-label" style={{ marginBottom: 0 }}>Today's Medications</p>
+            <button
+              className="btn-secondary"
+              onClick={announceMedications}
+              style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", padding: "8px 12px" }}
+            >
+              <Icon.Volume size={14} /> Voice Alert
+            </button>
+          </div>
+          {medAlertSent && (
+            <div className="badge badge-teal" style={{ marginBottom: "12px", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+              <Icon.Check size={12} /> Medication reminder spoken
+            </div>
+          )}
           {upcomingMeds.length === 0 ? (
             <div className="alert-card info">
               <Icon.Pill size={20} />
