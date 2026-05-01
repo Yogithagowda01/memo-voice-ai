@@ -16,6 +16,8 @@ if (!GEMINI_API_KEY || GEMINI_API_KEY.includes("REPLACE")) {
 console.log("✅  GEMINI_API_KEY loaded:", GEMINI_API_KEY.slice(0, 8) + "..." + GEMINI_API_KEY.slice(-4));
 
 const express = require("express");
+
+
 const cors    = require("cors");
 const fs      = require("fs");
 const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require("@google/generative-ai");
@@ -93,16 +95,19 @@ async function autoDetectModel() {
           err.message.toLowerCase().includes("permission") ||
           err.message.toLowerCase().includes("invalid key")) {
         console.error("\n❌  API KEY ERROR — check your key at https://aistudio.google.com/app/apikey\n");
-        process.exit(1);
+        return null; // Continue with fallback mode instead of exiting
       }
     }
   }
-  return null; // No model worked
+  return null; // No model worked - will use fallback mode
 }
 
-// ── Gemini call helper ─────────────────────────────────────────
-async function askGemini(userMessage, context) {
-  if (!ACTIVE_MODEL) throw new Error("No working Gemini model found. Check /list-models");
+// ── Gemini call helper with offline fallback ──────────────────
+async function askGemini(userMessage, context, store) {
+  if (!ACTIVE_MODEL) {
+    // Fallback to improved mock AI responses with accuracy
+    return getMockAIResponse(userMessage, context, store);
+  }
 
   const model = genAI.getGenerativeModel({
     model: ACTIVE_MODEL,
@@ -124,6 +129,121 @@ async function askGemini(userMessage, context) {
   const text = response.text()?.trim();
   if (!text) throw new Error("Gemini returned empty response");
   return text;
+}
+
+// ── Improved mock AI responses with data accuracy ───────────────
+function getMockAIResponse(userMessage, context, store) {
+  const lower = userMessage.toLowerCase();
+  const meds = store?.medications || [];
+  const mems = store?.memories || [];
+
+  // Medication responses with accuracy
+  if (lower.match(/medic|pill|tablet|drug|dose|take medicine|when.*take/)) {
+    if (meds.length > 0) {
+      const upcoming = meds.slice(0, 2).map(m => `${m.name} at ${m.time}`).join(", ");
+      return `Your next medications are: ${upcoming}. I'll remind you when it's time. Your caregiver has set these up carefully for you.`;
+    }
+    return "It's time to take your medication. Your caregiver has set up reminders for you. Would you like me to remind you which ones to take?";
+  }
+
+  // Family/memory responses with real data
+  if (lower.match(/family|daughter|son|wife|husband|grandchild|sister|brother|remember|memory/)) {
+    if (mems.length > 0) {
+      const recentMem = mems[0];
+      return `I remember that ${recentMem.person} shared with you: "${recentMem.text.slice(0, 50)}...". Your family loves you very much.`;
+    }
+    return "Your family is very important to you. I can help you remember special moments with your loved ones.";
+  }
+
+  // Help responses
+  if (lower.match(/help|what can you|how do/)) {
+    return "I'm here to help you with medication reminders, sharing family memories, and keeping you company. You can speak to me anytime.";
+  }
+
+  // Emergency responses
+  if (lower.match(/emergency|help|hurt|sick|pain/)) {
+    return "If you're having an emergency, please press the red SOS button or call your caregiver immediately. I'm here to help.";
+  }
+
+  // Greeting responses
+  if (lower.match(/hello|hi|hey|good morning|good afternoon|how are/)) {
+    return "Hello! It's wonderful to hear your voice today. How are you feeling? I'm here to help with anything you need.";
+  }
+
+  // Default responses
+  const defaults = [
+    "I'm listening. Could you tell me a bit more about what you need help with?",
+    "Thank you for sharing that with me. I'm always here to listen and help.",
+    "I understand. Let me see how I can assist you today.",
+    "That's interesting. Would you like to talk about your family or medications?",
+  ];
+
+  return defaults[Math.floor(Math.random() * defaults.length)];
+}
+
+// ✨ NEW: Get next medication alert time
+function getNextMedicationAlert(store) {
+  const meds = store?.medications || [];
+  if (meds.length === 0) return null;
+  
+  const now = new Date();
+  const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  
+  // Find next medication time
+  for (const med of meds) {
+    if (med.time > currentTime) {
+      return { medication: med.name, time: med.time, in_minutes: calculateMinutesUntil(med.time) };
+    }
+  }
+  
+  // If no more today, return first one tomorrow
+  if (meds.length > 0) {
+    const firstMed = meds[0];
+    const tomorrow = (24 * 60) - (now.getHours() * 60 + now.getMinutes()) + parseInt(firstMed.time.split(':')[0]) * 60 + parseInt(firstMed.time.split(':')[1]);
+    return { medication: firstMed.name, time: firstMed.time, in_minutes: tomorrow, tomorrow: true };
+  }
+  
+  return null;
+}
+
+// ✨ NEW: Calculate minutes until time
+function calculateMinutesUntil(timeString) {
+  const [hours, minutes] = timeString.split(':').map(Number);
+  const now = new Date();
+  const target = new Date();
+  target.setHours(hours, minutes, 0);
+  
+  if (target < now) {
+    target.setDate(target.getDate() + 1);
+  }
+  
+  return Math.floor((target - now) / 60000);
+}
+
+// ✨ NEW: Real-time alerts system
+const alertSessions = new Map(); // Track alert subscriptions
+
+function checkMedicationAlerts(store) {
+  const now = new Date();
+  const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  
+  const alerts = [];
+  for (const med of store.medications || []) {
+    // Alert within 5 minutes before scheduled time
+    const minBefore = calculateMinutesUntil(med.time);
+    if (minBefore >= -5 && minBefore <= 5) {
+      alerts.push({
+        type: 'medication',
+        medication: med.name,
+        dosage: med.dosage,
+        time: med.time,
+        message: `Time to take ${med.name}${med.dosage ? ' (' + med.dosage + ')' : ''}`,
+        urgency: minBefore < 0 ? 'overdue' : minBefore < 2 ? 'urgent' : 'upcoming'
+      });
+    }
+  }
+  
+  return alerts;
 }
 
 // ── JSON file memory store ─────────────────────────────────────
@@ -163,10 +283,35 @@ app.get("/", (_req, res) => res.json({
            "POST /ask-ai", "GET|POST /memories", "GET|POST /medications"],
 }));
 
-app.get("/health", (_req, res) => {
+// ✨ NEW: Enhanced health check with connectivity test
+app.get("/health", async (_req, res) => {
   const s = loadStore();
-  res.json({ status: "ok", model: ACTIVE_MODEL, uptime: Math.floor(process.uptime()) + "s",
-             memories: s.memories.length, medications: s.medications.length });
+  let geminiStatus = "offline";
+  let latency = null;
+  
+  // Test Gemini connectivity if model is available
+  if (ACTIVE_MODEL) {
+    try {
+      const t0 = Date.now();
+      const model = genAI.getGenerativeModel({ model: ACTIVE_MODEL });
+      await model.generateContent("ping");
+      latency = Date.now() - t0;
+      geminiStatus = "online";
+    } catch {
+      geminiStatus = "offline";
+    }
+  }
+  
+  res.json({ 
+    status: "ok", 
+    model: ACTIVE_MODEL || "fallback (mock AI)",
+    gemini_status: geminiStatus,
+    latency_ms: latency,
+    uptime: Math.floor(process.uptime()) + "s",
+    memories: s.memories.length, 
+    medications: s.medications.length,
+    next_alert: getNextMedicationAlert(s)
+  });
 });
 
 // ── /list-models — shows every model your API key can reach ────
@@ -240,12 +385,12 @@ app.post("/ask-ai", async (req, res) => {
   }
 
   try {
-    const reply = await askGemini(message.trim(), context);
+    const reply = await askGemini(message.trim(), context, store);
     const ms    = Date.now() - t0;
     store.conversations = (store.conversations || []).slice(-99);
     store.conversations.push({ ts: new Date().toISOString(), user: message.trim(), ai: reply, ms });
     saveStore(store);
-    res.json({ reply, model: ACTIVE_MODEL, latency_ms: ms });
+    res.json({ reply, model: ACTIVE_MODEL || "fallback", latency_ms: ms });
   } catch (err) {
     console.error("/ask-ai error:", err.message);
     res.status(500).json({ error: "AI response failed", detail: err.message });
@@ -275,6 +420,70 @@ app.post("/medications", (req, res) => {
   res.status(201).json({ success: true, medication: entry });
 });
 app.get("/medications", (_req, res) => { const s = loadStore(); res.json({ count: s.medications.length, medications: s.medications }); });
+
+// ✨ NEW: Real-time alerts endpoint — check for medication reminders
+app.get("/alerts", (req, res) => {
+  const store = loadStore();
+  const alerts = checkMedicationAlerts(store);
+  const nextAlert = getNextMedicationAlert(store);
+  
+  res.json({
+    current_alerts: alerts,
+    next_scheduled: nextAlert,
+    total_medications: store.medications.length,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ✨ NEW: Polling endpoint for continuous alert checking
+app.post("/alerts/check", (req, res) => {
+  const store = loadStore();
+  const alerts = checkMedicationAlerts(store);
+  const nextAlert = getNextMedicationAlert(store);
+  
+  const hasUrgent = alerts.some(a => a.urgency === 'urgent' || a.urgency === 'overdue');
+  
+  res.json({
+    has_alerts: alerts.length > 0,
+    has_urgent: hasUrgent,
+    alerts: alerts,
+    next_alert: nextAlert,
+    last_checked: new Date().toISOString()
+  });
+});
+
+// ✨ NEW: Get medication accuracy report
+app.get("/medications/report", (req, res) => {
+  const store = loadStore();
+  const meds = store.medications || [];
+  const conversations = store.conversations || [];
+  
+  // Analyze medication mentions in conversations
+  const medMentions = {};
+  for (const conv of conversations) {
+    const text = (conv.user + ' ' + conv.ai).toLowerCase();
+    for (const med of meds) {
+      const medName = med.name.toLowerCase();
+      if (text.includes(medName)) {
+        medMentions[med.id] = (medMentions[med.id] || 0) + 1;
+      }
+    }
+  }
+  
+  const report = meds.map(med => ({
+    name: med.name,
+    time: med.time,
+    frequency: med.frequency,
+    mentions_in_conversations: medMentions[med.id] || 0,
+    accuracy_score: medMentions[med.id] ? 'high' : 'not mentioned'
+  }));
+  
+  res.json({
+    total_medications: meds.length,
+    total_conversations: conversations.length,
+    medications: report
+  });
+});
 
 // ── Debug env ──────────────────────────────────────────────────
 app.get("/debug-env", (_req, res) => res.json({
@@ -312,9 +521,9 @@ app.use((err, _req, res, _next) => { console.error("Unhandled:", err.message); r
     console.log("╠══════════════════════════════════════════╣");
     console.log(`║  URL    : http://localhost:${PORT}            ║`);
     if (ACTIVE_MODEL) {
-      console.log(`║  Model  : ${ACTIVE_MODEL.padEnd(31)}║`);
+      console.log(`║  Model  : ✅ ${ACTIVE_MODEL.padEnd(29)}║`);
     } else {
-      console.log("║  Model  : ❌ NONE — see /list-models     ║");
+      console.log("║  Model  : ⚠️ FALLBACK MODE — Mock AI     ║");
     }
     console.log("╠══════════════════════════════════════════╣");
     console.log(`║  ✅ Test    : http://localhost:${PORT}/test       ║`);

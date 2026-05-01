@@ -1,5 +1,70 @@
 {
-  "memories": [],
-  "medications": [],
-  "conversations": []
+  "memories": [
+    {
+      "id": "1777542793023",
+      "text": "Had a beautiful dinner with my daughter Priya and son Rahul on Diwali. We laughed, shared stories, and lit diyas together.",
+      "person": "Shared by : Daughter Priya",
+      "category": "family",
+      "date": "30/4/2026",
+      "created": "2026-04-30T09:53:13.175Z"
+    }
+  ],
+  "medications": [
+    {
+      "id": "1777542475386",
+      "name": "Donepezil",
+      "dosage": "1",
+      "time": "20:00",
+      "frequency": "daily",
+      "created": "2026-04-30T09:47:55.386Z"
+    },
+    {
+      "id": "1777542502206",
+      "name": "Lisinopiril",
+      "dosage": "1",
+      "time": "17:30",
+      "frequency": "daily",
+      "created": "2026-04-30T09:48:22.206Z"
+    },
+    {
+      "id": "1777542531683",
+      "name": "Memantine",
+      "dosage": "1",
+      "time": "15:20",
+      "frequency": "daily",
+      "created": "2026-04-30T09:48:51.684Z"
+    }
+  ],
+  "conversations": [
+    {
+      "ts": "2026-04-30T05:51:10.105Z",
+      "user": "WHEN IS MY NEXT MEDICINE",
+      "ai": "It's time to take your medication. Your caregiver has set up reminders for you. Would you like me to remind you which ones to take?",
+      "ms": 1
+    },
+    {
+      "ts": "2026-04-30T07:31:32.632Z",
+      "user": "WHEN DID WE CELEBRATED OUR ANNIVERSARY",
+      "ai": "Thank you for sharing that with me. I'm always here to listen and help.",
+      "ms": 3
+    },
+    {
+      "ts": "2026-04-30T09:53:38.601Z",
+      "user": "next medicine",
+      "ai": "It's time to take your medication. Your caregiver has set up reminders for you. Would you like me to remind you which ones to take?",
+      "ms": 1
+    },
+    {
+      "ts": "2026-04-30T09:53:53.277Z",
+      "user": "yes remind me",
+      "ai": "I'm listening. Could you tell me a bit more about what you need help with?",
+      "ms": 0
+    },
+    {
+      "ts": "2026-04-30T09:54:06.009Z",
+      "user": "remind my tablets",
+      "ai": "It's time to take your medication. Your caregiver has set up reminders for you. Would you like me to remind you which ones to take?",
+      "ms": 1
+    }
+  ]
 }
